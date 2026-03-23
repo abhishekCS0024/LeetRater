@@ -1,76 +1,96 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Leet Rater — Settings</title>
+  <title>Leet Rater</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      width: 320px;
-      background: #1a1a1a;
-      color: #eff1f6;
+      width: 300px;
+      background: #111113;
+      color: #e8eaed;
       font-family: -apple-system, 'Segoe UI', sans-serif;
       font-size: 13px;
-      padding: 20px;
+      padding: 18px;
     }
 
+    /* Header */
     .header {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 20px;
+      gap: 10px;
+      margin-bottom: 18px;
       padding-bottom: 14px;
-      border-bottom: 1px solid #3a3a3a;
+      border-bottom: 1px solid #2a2a2e;
     }
+    .header-icon {
+      width: 30px; height: 30px;
+      background: linear-gradient(135deg, #ffa116, #cc8010);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; color: #111; flex-shrink: 0;
+    }
+    .header-title { font-size: 14px; font-weight: 700; color: #ffa116; }
+    .header-sub   { font-size: 11px; color: #55555f; margin-top: 2px; }
 
-    .header-icon { font-size: 18px; }
+    /* Key status card */
+    .key-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #1c1c1f;
+      border: 1px solid #2a2a2e;
+      border-radius: 8px;
+      margin-bottom: 14px;
+      transition: border-color 0.25s;
+    }
+    .key-card.saved { border-color: #00b8a3; }
+    .key-card.error { border-color: #ef4743; }
 
-    .header-title {
-      font-size: 14px;
+    .key-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #ef4743;
+      flex-shrink: 0;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+    .key-dot.saved { background: #00b8a3; box-shadow: 0 0 6px rgba(0,184,163,0.5); }
+
+    .key-card-title { font-size: 12px; color: #e8eaed; }
+    .key-card-sub   { font-size: 11px; color: #55555f; margin-top: 2px; }
+
+    /* Label */
+    .field-label {
+      font-size: 10px;
       font-weight: 700;
-      color: #ffa116;
-      letter-spacing: 0.3px;
-    }
-
-    .header-sub {
-      font-size: 11px;
-      color: #8a8a8a;
-      margin-top: 1px;
-    }
-
-    .section { margin-bottom: 18px; }
-
-    label {
-      display: block;
-      font-size: 11px;
-      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: #8a8a8a;
+      letter-spacing: 1px;
+      color: #55555f;
       margin-bottom: 6px;
     }
 
-    input[type="password"],
-    input[type="text"] {
-      width: 100%;
-      padding: 9px 12px;
-      background: #282828;
-      border: 1px solid #3a3a3a;
-      border-radius: 6px;
-      color: #eff1f6;
-      font-size: 13px;
-      font-family: 'Consolas', monospace;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-
-    input:focus { border-color: #ffa116; }
-
-    .input-row { display: flex; gap: 8px; }
+    /* Input row */
+    .input-row { display: flex; gap: 8px; margin-bottom: 12px; }
     .input-row input { flex: 1; }
 
+    input[type="password"], input[type="text"] {
+      width: 100%;
+      padding: 9px 12px;
+      background: #1c1c1f;
+      border: 1px solid #2a2a2e;
+      border-radius: 6px;
+      color: #e8eaed;
+      font-size: 12px;
+      font-family: 'Consolas', monospace;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus { border-color: #ffa116; box-shadow: 0 0 0 2px rgba(255,161,22,0.1); }
+
+    /* Buttons */
     .btn {
       padding: 9px 14px;
       border: none;
@@ -78,192 +98,108 @@
       font-size: 12px;
       font-weight: 700;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: background 0.2s, transform 0.1s;
       white-space: nowrap;
     }
+    .btn:active { transform: scale(0.97); }
 
-    .btn-primary { background: #ffa116; color: #1a1a1a; }
-    .btn-primary:hover { background: #cc8010; }
+    .btn-primary { background: #ffa116; color: #111; width: 100%; font-size: 13px; padding: 11px; }
+    .btn-primary:hover:not(:disabled) { background: #e8920e; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .btn-ghost { background: #333; color: #eff1f6; }
-    .btn-ghost:hover { background: #3a3a3a; }
+    .btn-ghost { background: #26262a; color: #e8eaed; border: 1px solid #2a2a2e; }
+    .btn-ghost:hover { background: #2e2e33; }
 
-    .hint {
-      font-size: 11px;
-      color: #8a8a8a;
-      margin-top: 6px;
-      line-height: 1.6;
-    }
-
-    .hint a { color: #ffa116; text-decoration: none; }
-    .hint a:hover { text-decoration: underline; }
-
+    /* Status message */
     .status {
       margin-top: 8px;
       font-size: 12px;
       padding: 7px 10px;
       border-radius: 6px;
       display: none;
+      line-height: 1.5;
     }
+    .status.success { background: rgba(0,184,163,0.1); color: #00b8a3; border: 1px solid rgba(0,184,163,0.25); }
+    .status.error   { background: rgba(239,71,67,0.08); color: #ef4743; border: 1px solid rgba(239,71,67,0.22); }
 
-    .status.success {
-      background: rgba(0, 184, 163, 0.12);
-      color: #00b8a3;
-      border: 1px solid rgba(0, 184, 163, 0.25);
-    }
-
-    .status.error {
-      background: rgba(239, 71, 67, 0.1);
-      color: #ef4743;
-      border: 1px solid rgba(239, 71, 67, 0.25);
-    }
-
-    .divider {
-      height: 1px;
-      background: #3a3a3a;
-      margin: 18px 0;
-    }
-
-    /* Key status indicator */
-    .key-status {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 12px;
-      background: #282828;
-      border: 1px solid #3a3a3a;
-      border-radius: 6px;
-      margin-bottom: 14px;
-    }
-
-    .key-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      transition: background 0.3s;
-    }
-
-    .key-dot.saved   { background: #00b8a3; box-shadow: 0 0 6px rgba(0,184,163,0.4); }
-    .key-dot.missing { background: #ef4743; }
-
-    .key-status-text { font-size: 12px; color: #eff1f6; }
-    .key-status-sub  { font-size: 11px; color: #8a8a8a; margin-top: 1px; }
+    .divider { height: 1px; background: #2a2a2e; margin: 16px 0; }
 
     /* Steps */
-    .step {
-      display: flex;
-      gap: 8px;
-      align-items: flex-start;
-      margin-bottom: 7px;
-    }
-
-    .step-num {
-      width: 17px;
-      height: 17px;
+    .steps-label { margin-bottom: 8px; }
+    .step { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 6px; }
+    .step-n {
+      width: 16px; height: 16px;
       border-radius: 50%;
-      background: rgba(255, 161, 22, 0.15);
+      background: rgba(255,161,22,0.12);
       color: #ffa116;
-      font-size: 10px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      margin-top: 1px;
+      font-size: 9px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
     }
+    .step-t { font-size: 11px; color: #7a7a85; line-height: 1.55; }
+    .step-t a { color: #ffa116; text-decoration: none; }
+    .step-t a:hover { text-decoration: underline; }
 
-    .step-text {
-      font-size: 11px;
-      color: #8a8a8a;
-      line-height: 1.55;
-    }
+    /* Info rows */
+    .info-row { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; }
+    .info-k   { color: #3a3a3e; }
+    .info-v   { color: #7a7a85; }
 
-    .step-text a { color: #ffa116; text-decoration: none; }
-    .step-text a:hover { text-decoration: underline; }
-
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      padding: 3px 0;
-    }
-
-    .info-label { color: #555; }
-    .info-value { color: #8a8a8a; }
-
-    .footer {
-      margin-top: 4px;
-      font-size: 11px;
-      color: #555;
-      text-align: center;
-    }
+    .footer { text-align: center; font-size: 11px; color: #3a3a3e; }
   </style>
 </head>
 <body>
 
-  <!-- Header -->
   <div class="header">
-    <span class="header-icon">&#9889;</span>
+    <div class="header-icon">&#9889;</div>
     <div>
       <div class="header-title">Leet Rater</div>
       <div class="header-sub">Settings &amp; API Key</div>
     </div>
   </div>
 
-  <!-- Key status indicator -->
-  <div class="key-status">
-    <div class="key-dot missing" id="key-dot"></div>
+  <div class="key-card" id="key-card">
+    <div class="key-dot" id="key-dot"></div>
     <div>
-      <div class="key-status-text" id="key-status-text">No API key saved</div>
-      <div class="key-status-sub"  id="key-status-sub">Required to analyze code</div>
+      <div class="key-card-title" id="key-card-title">No API key saved</div>
+      <div class="key-card-sub"   id="key-card-sub">Required to analyze code</div>
     </div>
   </div>
 
-  <!-- API Key input -->
-  <div class="section">
-    <label>Groq API Key</label>
-    <div class="input-row">
-      <input type="password" id="api-key-input" placeholder="gsk_••••••••••••••••••••••" />
-      <button class="btn btn-ghost" id="toggle-visibility">Show</button>
-    </div>
-    <div class="status" id="status-msg"></div>
+  <div class="field-label">Groq API Key</div>
+  <div class="input-row">
+    <input type="password" id="api-key" placeholder="gsk_••••••••••••••••••••••" autocomplete="off"/>
+    <button class="btn btn-ghost" id="toggle-vis">Show</button>
   </div>
 
-  <button class="btn btn-primary" id="save-btn" style="width:100%">Save API Key</button>
+  <button class="btn btn-primary" id="save-btn">Save API Key</button>
+  <div class="status" id="status"></div>
 
   <div class="divider"></div>
 
-  <!-- How to get started -->
-  <div class="section">
-    <label>How to get started</label>
-    <div class="step">
-      <div class="step-num">1</div>
-      <div class="step-text">
-        Visit <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a>
-        — free, no credit card needed
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">2</div>
-      <div class="step-text">Create a new API key and paste it above, then click Save</div>
-    </div>
-    <div class="step">
-      <div class="step-num">3</div>
-      <div class="step-text">Open any LeetCode problem, write your solution, and click Analyze</div>
-    </div>
+  <div class="field-label steps-label">How to get started</div>
+  <div class="step">
+    <div class="step-n">1</div>
+    <div class="step-t">Visit <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a> — free, no credit card needed</div>
+  </div>
+  <div class="step">
+    <div class="step-n">2</div>
+    <div class="step-t">Create a new API key and paste it above, then save</div>
+  </div>
+  <div class="step">
+    <div class="step-n">3</div>
+    <div class="step-t">Open any LeetCode problem, write your solution, click Analyze</div>
   </div>
 
   <div class="divider"></div>
 
-  <!-- Info -->
-  <div style="margin-bottom: 16px;">
-    <div class="info-row"><span class="info-label">Model</span><span class="info-value">llama-3.3-70b-versatile</span></div>
-    <div class="info-row"><span class="info-label">Provider</span><span class="info-value">Groq (free tier available)</span></div>
-    <div class="info-row"><span class="info-label">Your code</span><span class="info-value">Sent to Groq API only</span></div>
+  <div style="margin-bottom:14px;">
+    <div class="info-row"><span class="info-k">Model</span><span class="info-v">llama-3.3-70b-versatile</span></div>
+    <div class="info-row"><span class="info-k">Provider</span><span class="info-v">Groq — free tier available</span></div>
+    <div class="info-row"><span class="info-k">Your code</span><span class="info-v">Sent to Groq API only</span></div>
   </div>
 
-  <div class="footer">Leet Rater v1.0</div>
+  <div class="footer">Leet Rater v2.0</div>
 
   <script src="settings.js"></script>
 </body>

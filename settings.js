@@ -1,69 +1,97 @@
-// ─────────────────────────────────────────────
-//  LeetCode Code Rater — settings.js
-// ─────────────────────────────────────────────
+'use strict';
 
-const pilotToggle    = document.getElementById("pilot-toggle");
-const apiKeyInput    = document.getElementById("api-key-input");
-const toggleVis      = document.getElementById("toggle-visibility");
-const saveBtn        = document.getElementById("save-btn");
-const statusMsg      = document.getElementById("status-msg");
+/**
+ * Leet Rater — settings.js
+ *
+ * Handles: API key load/save, show/hide toggle, status card update.
+ * All chrome.* calls are guarded — settings popup can open before
+ * the service worker wakes, making chrome.runtime temporarily unavailable.
+ */
 
-// ── Load saved settings on open ───────────────
-chrome.storage.local.get(["groqApiKey", "pilotMode"], (data) => {
-  pilotToggle.checked = data.pilotMode !== false; // default: pilot ON
-  apiKeyInput.value   = data.groqApiKey || "";
-  updateSaveLabel();
-});
+const apiKey  = document.getElementById('api-key');
+const toggleV = document.getElementById('toggle-vis');
+const saveBtn = document.getElementById('save-btn');
+const status  = document.getElementById('status');
+const keyCard = document.getElementById('key-card');
+const keyDot  = document.getElementById('key-dot');
+const keyTitle= document.getElementById('key-card-title');
+const keySub  = document.getElementById('key-card-sub');
 
-// ── Toggle key visibility ─────────────────────
-toggleVis.addEventListener("click", () => {
-  const isPassword = apiKeyInput.type === "password";
-  apiKeyInput.type    = isPassword ? "text" : "password";
-  toggleVis.textContent = isPassword ? "Hide" : "Show";
-});
-
-// ── Pilot toggle changes save label ──────────
-pilotToggle.addEventListener("change", updateSaveLabel);
-
-function updateSaveLabel() {
-  saveBtn.textContent = pilotToggle.checked
-    ? "Save settings (pilot mode on)"
-    : "Save settings";
+// ── Load saved key on popup open ──────────────────────────────────────────────
+if (typeof chrome !== 'undefined' && chrome.storage) {
+  chrome.storage.local.get('groqApiKey', data => {
+    if (data.groqApiKey) {
+      apiKey.value    = data.groqApiKey;
+      saveBtn.textContent = 'Update API Key';
+      setCard(true);
+    }
+  });
 }
 
-// ── Save ──────────────────────────────────────
-saveBtn.addEventListener("click", () => {
-  const key    = apiKeyInput.value.trim();
-  const isPilot = pilotToggle.checked;
-
-  if (!isPilot && !key) {
-    showStatus("error", "Please enter a Groq API key, or enable pilot mode.");
-    return;
-  }
-
-  // Validate Groq key format — must start with "gsk_" and be at least 20 chars
-  if (!isPilot && (!key.startsWith("gsk_") || key.length < 20)) {
-    showStatus("error", "Invalid key format. Groq keys start with 'gsk_'.");
-    return;
-  }
-
-  chrome.storage.local.set(
-    { groqApiKey: key, pilotMode: isPilot },
-    () => {
-      // Also notify background.js to pick up the new settings
-      chrome.runtime.sendMessage({ action: "settingsUpdated", pilotMode: isPilot });
-      showStatus("success", isPilot
-        ? "Saved! Running in pilot mode."
-        : "API key saved. Pilot mode disabled."
-      );
-    }
-  );
+// ── Show / Hide toggle ────────────────────────────────────────────────────────
+toggleV.addEventListener('click', () => {
+  const isHidden   = apiKey.type === 'password';
+  apiKey.type      = isHidden ? 'text' : 'password';
+  toggleV.textContent = isHidden ? 'Hide' : 'Show';
 });
 
-// ── Show status message ───────────────────────
-function showStatus(type, message) {
-  statusMsg.textContent  = message;
-  statusMsg.className    = `status ${type}`;
-  statusMsg.style.display = "block";
-  setTimeout(() => { statusMsg.style.display = "none"; }, 3000);
+// ── Save ──────────────────────────────────────────────────────────────────────
+saveBtn.addEventListener('click', () => {
+  const key = apiKey.value.trim();
+
+  if (!key) {
+    showStatus('error', 'Please enter your Groq API key.');
+    return;
+  }
+
+  if (!key.startsWith('gsk_') || key.length < 20) {
+    showStatus('error', "Invalid key — Groq keys start with 'gsk_'.");
+    return;
+  }
+
+  if (typeof chrome === 'undefined' || !chrome.storage) {
+    showStatus('error', 'Extension error. Please reload the popup.');
+    return;
+  }
+
+  saveBtn.disabled    = true;
+  saveBtn.textContent = 'Saving\u2026';
+
+  chrome.storage.local.set({ groqApiKey: key }, () => {
+    saveBtn.disabled    = false;
+    saveBtn.textContent = 'Update API Key';
+    setCard(true);
+    showStatus('success', '✓ API key saved — you can now analyze solutions.');
+
+    // Notify background service worker.
+    // Wrapped in try/catch because chrome.runtime can be undefined
+    // in MV3 when the service worker is inactive.
+    try {
+      if (chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ action: 'settingsUpdated' }, () => {
+          void chrome.runtime.lastError; // intentionally consumed
+        });
+      }
+    } catch {
+      // Service worker asleep — safe to ignore, key is already persisted
+    }
+  });
+});
+
+// ── Status card ───────────────────────────────────────────────────────────────
+function setCard(saved) {
+  keyCard.className       = saved ? 'key-card saved' : 'key-card';
+  keyDot.className        = saved ? 'key-dot saved'  : 'key-dot';
+  keyTitle.textContent    = saved ? 'API key saved'   : 'No API key saved';
+  keySub.textContent      = saved ? 'Ready to analyze code' : 'Required to analyze code';
+}
+
+// ── Status message ────────────────────────────────────────────────────────────
+let statusTimer = null;
+function showStatus(type, msg) {
+  clearTimeout(statusTimer);
+  status.textContent   = msg;
+  status.className     = 'status ' + type;
+  status.style.display = 'block';
+  statusTimer = setTimeout(() => { status.style.display = 'none'; }, 4500);
 }

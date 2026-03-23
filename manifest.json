@@ -1,36 +1,47 @@
 {
   "manifest_version": 3,
   "name": "Leet Rater",
-  "version": "1.0",
-  "description": "Rates your LeetCode solution out of 10 with detailed, constructive feedback.",
+  "version": "2.0.0",
+  "description": "AI-powered LeetCode code reviewer. Rates your solution out of 10 with detailed, constructive feedback.",
+
   "permissions": [
-    "activeTab",
     "storage",
+    "activeTab",
     "scripting"
   ],
+
   "host_permissions": [
     "https://leetcode.com/*",
     "https://api.groq.com/*"
   ],
+
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
+
   "content_scripts": [
     {
-      "matches": [
-        "https://leetcode.com/problems/*"
-      ],
-      "js": [
-        "content.js"
-      ],
-      "css": [
-        "styles.css"
-      ],
+      "matches": ["https://leetcode.com/problems/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
       "run_at": "document_idle"
     }
   ],
+
   "action": {
     "default_popup": "settings.html",
-    "default_title": "LeetCode Leet Rater Settings"
+    "default_title": "Leet Rater",
+    "default_icon": {
+      "16":  "icons/icon16.png",
+      "48":  "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+
+  "icons": {
+    "16":  "icons/icon16.png",
+    "48":  "icons/icon48.png",
+    "128": "icons/icon128.png"
   }
 }
