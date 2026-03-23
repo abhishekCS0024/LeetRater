@@ -25,20 +25,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 async function handleRating({ code, language, title, description }) {
   const { pilotMode } = await chrome.storage.local.get("pilotMode");
-  const isPilot = pilotMode !== false; // default ON
+  const isPilot = pilotMode !== false;
 
   if (isPilot) {
     await sleep(1800);
     return getMockResponse(language);
   }
 
-  // Auto-retry once — truncation and malformed JSON are usually transient
+  // ── Phase 0: Validate code before rating ──────
+  // Ask Groq to check for syntax errors, empty/stub code, wrong language,
+  // and complete logical incorrectness BEFORE running the full rubric.
+  const validation = await validateCode({ code, language, title, description });
+
+  if (!validation.isValid) {
+    // Return a special validation-failed response instead of a rating
+    return buildValidationErrorResponse(validation);
+  }
+
+  // ── Phase 1: Full rating ───────────────────────
   try {
     return await callGroq({ code, language, title, description });
   } catch (err) {
-    const retryable = ["cut off", "plain text", "repaired", "malformed"];
+    const retryable = ["cut off", "plain text", "repaired", "malformed", "JSON"];
     if (retryable.some(kw => err.message.includes(kw))) {
-      console.warn("[LCR] Retrying after error:", err.message);
+      console.warn("[LCR] Retrying after:", err.message);
       await sleep(600);
       return await callGroq({ code, language, title, description });
     }
@@ -47,7 +57,104 @@ async function handleRating({ code, language, title, description }) {
 }
 
 
-// ── 3. Groq API call ──────────────────────────
+// ── 3. Code validation (Phase 0) ─────────────────
+
+const VALIDATION_PROMPT = `
+You are a code validator. Analyze the given code and check for:
+
+1. SYNTAX ERRORS — missing brackets, semicolons, wrong keywords, invalid tokens
+2. EMPTY / STUB CODE — function body is empty, only has comments, or just has "return null/0/-1" with no logic
+3. WRONG LANGUAGE — code appears to be in a different language than stated
+4. COMPLETELY WRONG LOGIC — code that clearly solves a totally different problem (not just suboptimal)
+5. COMPILATION ERRORS — use of undefined variables, wrong types, invalid method calls that would prevent compilation
+
+Be LENIENT on these — only flag clear, obvious errors. Do NOT flag:
+- Suboptimal algorithms (e.g., O(n²) when O(n) exists)
+- Missing edge cases
+- Poor variable names
+- Style issues
+
+Return ONLY this JSON (no markdown, no extra text):
+{
+  "isValid": <true if code is reasonable enough to rate, false if it has blocking errors>,
+  "errorType": <null if valid, or one of: "SYNTAX_ERROR" | "EMPTY_CODE" | "WRONG_LANGUAGE" | "WRONG_LOGIC" | "COMPILE_ERROR">,
+  "errorSummary": <null if valid, or a short 1-sentence summary like "Missing closing brace on line 8">,
+  "errorLines": <null if valid, or array of objects: [{"line": <number>, "issue": "<short description>", "code": "<the problematic line>"}]>,
+  "suggestion": <null if valid, or one concrete suggestion to fix the main error>
+}
+`.trim();
+
+async function validateCode({ code, language, title, description }) {
+  const { groqApiKey } = await chrome.storage.local.get("groqApiKey");
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${groqApiKey}`
+    },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      temperature: 0.1,   // very low — we want deterministic error detection
+      max_tokens: 600,    // validation response is small
+      messages: [
+        { role: "system", content: VALIDATION_PROMPT },
+        { role: "user",   content:
+            "Language: " + language + "\n" +
+            "Problem: " + title + "\n\n" +
+            "Code:\n\`\`\`" + language + "\n" + code + "\n\`\`\`\n\nValidate this code. Return JSON only."
+        }
+      ]
+    })
+  });
+
+  if (!response.ok) {
+    // If validation call fails, proceed with rating anyway — fail open
+    console.warn("[LCR] Validation API call failed — proceeding with rating");
+    return { isValid: true };
+  }
+
+  const result = await response.json();
+  const raw = result.choices?.[0]?.message?.content;
+  if (!raw) return { isValid: true };  // fail open
+
+  try {
+    const extracted = extractJSON(raw);
+    const parsed = tryParse(extracted) || tryParse(fixEscapes(extracted));
+    if (!parsed || typeof parsed.isValid !== "boolean") return { isValid: true };
+    return parsed;
+  } catch {
+    console.warn("[LCR] Validation parse failed — proceeding with rating");
+    return { isValid: true };  // fail open
+  }
+}
+
+// Builds a structured error response that content.js can render
+function buildValidationErrorResponse(validation) {
+  const errorLabels = {
+    "SYNTAX_ERROR":   { icon: "⚠", label: "Syntax Error",         color: "red"    },
+    "EMPTY_CODE":     { icon: "○", label: "No Code Found",         color: "muted"  },
+    "WRONG_LANGUAGE": { icon: "?", label: "Wrong Language",        color: "yellow" },
+    "WRONG_LOGIC":    { icon: "✕", label: "Incorrect Logic",       color: "red"    },
+    "COMPILE_ERROR":  { icon: "⚠", label: "Compilation Error",     color: "red"    },
+  };
+
+  const meta = errorLabels[validation.errorType] || { icon: "⚠", label: "Code Issue", color: "red" };
+
+  return {
+    isValidationError: true,
+    errorType: validation.errorType,
+    errorIcon: meta.icon,
+    errorLabel: meta.label,
+    errorColor: meta.color,
+    errorSummary: validation.errorSummary || "The code has issues that must be fixed before rating.",
+    errorLines: validation.errorLines || [],
+    suggestion: validation.suggestion || null,
+  };
+}
+
+
+// ── 4. Groq API call ──────────────────────────
 
 async function callGroq({ code, language, title, description }) {
   const { groqApiKey } = await chrome.storage.local.get("groqApiKey");
@@ -65,7 +172,7 @@ async function callGroq({ code, language, title, description }) {
     body: JSON.stringify({
       model: "llama-3.3-70b-versatile",
       temperature: 0.2,
-      max_tokens: 4000,  // full 10-criteria JSON needs ~2500 tokens
+      max_tokens: 4000,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user",   content: buildPrompt({ code, language, title, description }) }
@@ -372,55 +479,37 @@ Rate this solution using the rubric. Return valid JSON only.
 }
 
 
-// ── 6. Parse & validate API response ─────────
-//
-// 3-pass robust parser handles ALL common Groq/LLM issues:
-//   Pass 1 — direct JSON.parse (clean response)
-//   Pass 2 — fix invalid \u escapes and bare backslashes
-//   Pass 3 — nuclear: fix string values individually
-//
-// Also handles:
-//   • Preamble text before JSON ("Here is the rating: {...}")
-//   • Trailing text / code fences after JSON
-//   • Trailing commas in objects/arrays
-//   • Truncated responses (token limit hit)
-//   • finalScore arithmetic mismatch (auto-corrected)
+// ── 6. JSON helpers + robust parseResponse ───
 
 function extractJSON(raw) {
-  // Find the outermost JSON object
+  if (!raw) return null;
   const start = raw.indexOf("{");
   const end   = raw.lastIndexOf("}");
   if (start === -1 || end === -1 || end <= start) return null;
-
   let s = raw.slice(start, end + 1);
-
-  // Strip trailing commas before } or ] — common LLM mistake
-  s = s.replace(/,\s*([}\]])/g, "$1");
-
+  s = s.replace(/,\s*([}\]])/g, "$1"); // strip trailing commas
   return s;
 }
 
 function tryParse(s) {
+  if (!s) return null;
   try { return JSON.parse(s); } catch(e) { return null; }
 }
 
 function fixEscapes(s) {
-  // Fix \u not followed by exactly 4 hex chars (e.g. "\u—" or "\u20")
+  if (!s) return s;
   s = s.replace(/\\u(?![0-9a-fA-F]{4})/g, "\\\\u");
-  // Fix bare backslashes not part of valid JSON escape sequences
-  // Valid escapes: \\ \/ \" \n \r \t \b \f \uXXXX
   s = s.replace(/\\(?!["\\\\/bfnrtu])/gi, "\\\\");
   return s;
 }
 
 function nuclearFix(s) {
-  // Last resort: find every JSON string value and re-escape its contents
+  if (!s) return s;
   return s.replace(/"(?:[^"\\]|\\.)*"/g, function(match) {
-    const inner = match.slice(1, -1);
-    const fixed = inner
+    const inner = match.slice(1, -1)
       .replace(/\\(?!["\\\\/bfnrtu])/gi, "\\\\")
       .replace(/\\u(?![0-9a-fA-F]{4})/g, "\\\\u");
-    return '"' + fixed + '"';
+    return '"' + inner + '"';
   });
 }
 
@@ -429,38 +518,24 @@ function parseResponse(raw) {
 
   const extracted = extractJSON(raw);
   if (!extracted) {
-    console.error("[LCR] No JSON object found:", raw.slice(0, 400));
     throw new Error("Model returned plain text instead of JSON. Please try again.");
   }
 
-  // Check for truncation (unbalanced braces = cut off by token limit)
   const opens  = (extracted.match(/{/g) || []).length;
   const closes = (extracted.match(/}/g) || []).length;
   if (opens !== closes) {
-    console.error("[LCR] Truncated JSON: opens=" + opens + " closes=" + closes);
-    throw new Error("Response was cut off (token limit). Please try again — it usually succeeds on retry.");
+    throw new Error("Response was cut off (token limit hit). Please try again.");
   }
 
-  // Pass 1: clean parse
-  let parsed = tryParse(extracted);
+  const parsed = tryParse(extracted)
+              || tryParse(fixEscapes(extracted))
+              || tryParse(nuclearFix(extracted));
+
   if (!parsed) {
-    // Pass 2: fix escape sequences
-    console.warn("[LCR] Pass 1 failed — trying escape fix");
-    const fixed = fixEscapes(extracted);
-    parsed = tryParse(fixed);
-  }
-  if (!parsed) {
-    // Pass 3: nuclear string-level fix
-    console.warn("[LCR] Pass 2 failed — trying nuclear fix");
-    const nuclear = nuclearFix(extracted);
-    parsed = tryParse(nuclear);
-  }
-  if (!parsed) {
-    console.error("[LCR] All 3 passes failed. Extracted:", extracted.slice(0, 400));
+    console.error("[LCR] All parse passes failed:", extracted.slice(0, 300));
     throw new Error("Response JSON could not be repaired. Please try again.");
   }
 
-  // Validate required fields
   if (typeof parsed.verdict !== "string")
     throw new Error("Missing 'verdict' in response.");
   if (typeof parsed.finalScore !== "number")
@@ -470,16 +545,15 @@ function parseResponse(raw) {
   if (!Array.isArray(parsed.deductions))
     throw new Error("Missing 'deductions' in response.");
 
-  // Auto-correct finalScore if model arithmetic is off
   const computed = parsed.criteriaScores.reduce(
     (sum, c) => sum + (typeof c.earned === "number" ? c.earned : 0), 0
   );
   if (Math.abs(computed - parsed.finalScore) > 0.01) {
-    console.warn("[LCR] finalScore corrected:", parsed.finalScore, "→", computed);
+    console.warn("[LCR] finalScore corrected:", parsed.finalScore, "->", computed);
     parsed.finalScore = Math.round(computed * 10) / 10;
   }
 
-  console.log("[LCR] Parse successful. Score:", parsed.finalScore);
+  console.log("[LCR] Parsed OK. Score:", parsed.finalScore);
   return parsed;
 }
 

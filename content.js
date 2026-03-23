@@ -8,13 +8,17 @@
 function injectSidebar() {
   // Don't inject twice
   if (document.getElementById("lcr-sidebar")) return;
-  if (document.getElementById("lcr-tab")) return;
 
   const sidebar = document.createElement("div");
   sidebar.id = "lcr-sidebar";
   sidebar.classList.add("lcr-collapsed");
 
   sidebar.innerHTML = `
+    <!-- Toggle tab (always visible) -->
+    <div id="lcr-tab" title="LeetCode Code Rater">
+      <span id="lcr-tab-icon">⚡</span>
+    </div>
+
     <!-- Sidebar content -->
     <div id="lcr-panel">
 
@@ -68,14 +72,6 @@ function injectSidebar() {
     </div>
   `;
 
-  // Tab is injected separately as a fixed element so it
-  // never overlaps the editor when the sidebar is collapsed
-  const tab = document.createElement("div");
-  tab.id = "lcr-tab";
-  tab.title = "LeetCode Code Rater";
-  tab.innerHTML = '<span id="lcr-tab-icon">⚡</span>';
-  document.body.appendChild(tab);
-
   document.body.appendChild(sidebar);
   attachEventListeners();
 }
@@ -91,13 +87,11 @@ function attachEventListeners() {
 
   // Toggle open/close
   tab.addEventListener("click", () => {
-    const isCollapsed = sidebar.classList.toggle("lcr-collapsed");
-    tab.classList.toggle("lcr-open", !isCollapsed);
+    sidebar.classList.toggle("lcr-collapsed");
   });
 
   closeBtn.addEventListener("click", () => {
     sidebar.classList.add("lcr-collapsed");
-    tab.classList.remove("lcr-open");
   });
 
   // Main action
@@ -138,7 +132,12 @@ async function handleAnalyze() {
 
     if (response.error) throw new Error(response.error);
 
-    renderResults(response.data);
+    // BUG 2 FIX: if background returns a validation error, show error UI — not rating
+    if (response.data && response.data.isValidationError) {
+      renderValidationError(response.data);
+    } else {
+      renderResults(response.data);
+    }
     results.classList.remove("lcr-hidden");
 
   } catch (err) {
@@ -257,95 +256,169 @@ function scrapeProblem() {
 }
 
 
-// ── 6. Render results into sidebar ───────────
+// ── 6. Helpers + Render functions ────────────
 
+// Sanitize all API strings before innerHTML injection (prevents XSS)
+function sanitize(str) {
+  if (typeof str !== "string") return "";
+  return str
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// Renders validation error when code has syntax/compile/logic errors
+function renderValidationError(data) {
+  const sidebar = document.getElementById("lcr-sidebar");
+  sidebar.dataset.scoreTier = "low";
+
+  document.getElementById("lcr-verdict").innerHTML =
+    '<div class="lcr-validation-header">'
+    + '<span class="lcr-validation-icon">' + sanitize(data.errorIcon || "⚠") + '</span>'
+    + '<div>'
+    + '<div class="lcr-validation-label">' + sanitize(data.errorLabel || "Code Issue") + '</div>'
+    + '<div class="lcr-validation-summary">' + sanitize(data.errorSummary || "") + '</div>'
+    + '</div></div>';
+
+  document.getElementById("lcr-score-table").innerHTML =
+    '<div class="lcr-score-base"><span>Base score</span><span>10</span></div>'
+    + '<div class="lcr-divider"></div>'
+    + '<div class="lcr-validation-zero-row">'
+    + '<span class="lcr-validation-zero-label">Rating blocked</span>'
+    + '<span class="lcr-validation-zero-reason">Fix errors first</span>'
+    + '</div>';
+
+  document.getElementById("lcr-final-score").innerHTML =
+    '<div class="lcr-divider"></div>'
+    + '<div class="lcr-final-row"><span>Final score</span>'
+    + '<span class="lcr-score-badge lcr-score-invalid">— / 10</span></div>';
+
+  const lines = Array.isArray(data.errorLines) ? data.errorLines : [];
+  let html = '<div class="lcr-exp-section-label lcr-label-deducted">Issues found in your code</div>';
+  if (lines.length > 0) {
+    lines.forEach(function(err) {
+      html += '<div class="lcr-error-line-card">'
+        + '<div class="lcr-error-line-header">'
+        + '<span class="lcr-error-line-num">Line ' + sanitize(String(err.line || "?")) + '</span>'
+        + '<span class="lcr-error-line-issue">' + sanitize(err.issue || "") + '</span>'
+        + '</div>'
+        + (err.code ? '<div class="lcr-error-line-code">' + sanitize(err.code) + '</div>' : "")
+        + '</div>';
+    });
+  } else {
+    html += '<div class="lcr-explanation lcr-exp-deducted"><div class="lcr-exp-body">'
+      + sanitize(data.errorSummary || "Unknown error.") + '</div></div>';
+  }
+  document.getElementById("lcr-explanations").innerHTML = html;
+
+  document.getElementById("lcr-lang-tip").innerHTML = data.suggestion
+    ? '<div class="lcr-validation-suggestion">'
+      + '<span class="lcr-suggestion-label">How to fix it</span>'
+      + '<div class="lcr-exp-fix">' + sanitize(data.suggestion) + '</div></div>'
+    : '<div class="lcr-body-text" style="color:var(--lcr-text-muted)">Fix the error above and try again.</div>';
+
+  document.getElementById("lcr-optimal").innerHTML =
+    '<div class="lcr-body-text" style="color:var(--lcr-text-muted)">Rating unavailable until errors are resolved.</div>';
+}
+
+// Main results renderer — fully null-safe, handles all 7 bugs
 function renderResults(data) {
 
-  // Set score tier on sidebar for CSS color variables
-  const sidebar = document.getElementById('lcr-sidebar');
-  const tier = data.finalScore >= 8 ? 'high' : data.finalScore >= 5 ? 'mid' : 'low';
-  sidebar.dataset.scoreTier = tier;
+  // BUG 1 FIX: Guard against undefined criteriaScores — the root cause of the crash
+  if (!data || !Array.isArray(data.criteriaScores) || data.criteriaScores.length === 0) {
+    document.getElementById("lcr-verdict").innerHTML =
+      '<span class="lcr-quote" style="color:var(--lcr-red)">Rating data incomplete. Please try again.</span>';
+    return;
+  }
 
-  // ① One-liner verdict
+  const sidebar = document.getElementById("lcr-sidebar");
+  sidebar.dataset.scoreTier = data.finalScore >= 8 ? "high" : data.finalScore >= 5 ? "mid" : "low";
+
+  // ① BUG 7 FIX: Category badge + verdict
+  const catHTML = data.detectedCategory
+    ? '<div class="lcr-category-badge">'
+      + '<span class="lcr-category-icon">🎯</span>'
+      + '<span class="lcr-category-name">' + sanitize(data.detectedCategory) + '</span></div>'
+      + (data.categoryRationale
+          ? '<div class="lcr-category-rationale">' + sanitize(data.categoryRationale) + '</div>'
+          : "")
+    : "";
+
   document.getElementById("lcr-verdict").innerHTML =
-    '<span class="lcr-quote">"' + data.verdict + '"</span>';
+    catHTML + '<span class="lcr-quote">&ldquo;' + sanitize(data.verdict) + '&rdquo;</span>';
 
-  // ② Score breakdown — grouped criteria table
+  // ② Score breakdown table
   const groups = {};
   data.criteriaScores.forEach(function(c) {
     if (!groups[c.group]) groups[c.group] = [];
     groups[c.group].push(c);
   });
 
-  const tableEl = document.getElementById("lcr-score-table");
   let tableHTML = '<div class="lcr-score-base"><span>Base score</span><span>10</span></div><div class="lcr-divider"></div>';
-
   for (const group in groups) {
-    tableHTML += '<div class="lcr-group-label">' + group + '</div>';
+    tableHTML += '<div class="lcr-group-label">' + sanitize(group) + '</div>';
     groups[group].forEach(function(c) {
-      const scoreClass = c.status === "full" ? "lcr-score-full" : "lcr-score-lost";
-      const scoreText  = c.status === "full" ? "✓ 1" : c.earned === 0.5 ? "½" : "✗ 0";
+      // BUG 3 FIX: correct class for partial (yellow) not lost (red)
+      const scoreClass = c.status === "full"    ? "lcr-score-full"
+                       : c.status === "partial" ? "lcr-score-partial"
+                       : "lcr-score-lost";
+      const scoreText  = c.status === "full"    ? "✓ 1"
+                       : c.status === "partial" ? "½"
+                       : "✗ 0";
       tableHTML += '<div class="lcr-criteria-row">'
-        + '<span class="lcr-criteria-num">' + c.number + '</span>'
-        + '<span class="lcr-criteria-name">' + c.criterion + '</span>'
+        + '<span class="lcr-criteria-num">' + sanitize(String(c.number)) + '</span>'
+        + '<span class="lcr-criteria-name">' + sanitize(c.criterion) + '</span>'
         + '<span class="lcr-criteria-score ' + scoreClass + '">' + scoreText + '</span>'
         + '</div>';
     });
   }
-  tableEl.innerHTML = tableHTML;
+  document.getElementById("lcr-score-table").innerHTML = tableHTML;
 
   document.getElementById("lcr-final-score").innerHTML =
-    '<div class="lcr-divider"></div>'
-    + '<div class="lcr-final-row">'
-    + '<span>Final score</span>'
-    + '<span class="lcr-score-badge">' + data.finalScore + ' / 10</span>'
-    + '</div>';
+    '<div class="lcr-divider"></div><div class="lcr-final-row"><span>Final score</span>'
+    + '<span class="lcr-score-badge">' + data.finalScore + ' / 10</span></div>';
 
-
-  // ③ Per-criterion explanations — earned FIRST, deductions after
-  const expEl = document.getElementById("lcr-explanations");
-
+  // ③ Explanations — earned first, then deducted
   const earned   = data.criteriaScores.filter(function(c) { return c.status === "full"; });
   const deducted = data.criteriaScores.filter(function(c) { return c.status !== "full"; });
 
-  function renderCriterion(c) {
-    const ded = (data.deductions || []).find(function(d) { return d.criterion === c.criterion; });
-    const lost = (1 - c.earned);
-    const delta = c.status === "full" ? "+1" : (c.earned === 0.5 ? "+0.5" : "-" + lost);
-    const badgeClass = c.status === "full" ? "lcr-badge-full" : "lcr-badge-lost";
+  function buildCriterionCard(c) {
+    const ded  = (data.deductions || []).find(function(d) { return d.criterion === c.criterion; });
+    const lost = +(1 - c.earned).toFixed(1);
+    // BUG 5 FIX: partial shows "−0.5" not "+0.5"
+    const delta = c.status === "full"    ? "+1"
+                : c.status === "partial" ? "−0.5"
+                : "−" + lost;
+    // BUG 4 FIX: correct badge class for partial
+    const badgeClass = c.status === "full"    ? "lcr-badge-full"
+                     : c.status === "partial" ? "lcr-badge-partial"
+                     : "lcr-badge-lost";
+    // BUG 6 FIX: sanitize all API strings
     return '<div class="lcr-explanation lcr-exp-' + c.status + '">'
       + '<div class="lcr-exp-header">'
-      + '<span class="lcr-exp-num">' + c.number + '</span>'
-      + '<span class="lcr-exp-criterion">' + c.criterion + '</span>'
-      + '<span class="lcr-exp-badge ' + badgeClass + '">' + delta + '</span>'
-      + '</div>'
-      + '<div class="lcr-exp-body">' + c.comment + '</div>'
-      + (ded && ded.fix ? '<div class="lcr-exp-fix">Fix → ' + ded.fix + '</div>' : '')
+      + '<span class="lcr-exp-num">' + sanitize(String(c.number)) + '</span>'
+      + '<span class="lcr-exp-criterion">' + sanitize(c.criterion) + '</span>'
+      + '<span class="lcr-exp-badge ' + badgeClass + '">' + delta + '</span></div>'
+      + '<div class="lcr-exp-body">' + sanitize(c.comment || "") + '</div>'
+      + (ded && ded.fix ? '<div class="lcr-exp-fix">Fix → ' + sanitize(ded.fix) + '</div>' : "")
       + '</div>';
   }
 
   let expHTML = "";
-
   if (earned.length > 0) {
     expHTML += '<div class="lcr-exp-section-label lcr-label-earned">✓ Points you earned</div>';
-    earned.forEach(function(c) { expHTML += renderCriterion(c); });
+    earned.forEach(function(c) { expHTML += buildCriterionCard(c); });
   }
-
   if (deducted.length > 0) {
     expHTML += '<div class="lcr-exp-section-label lcr-label-deducted">✗ Where points were lost</div>';
-    deducted.forEach(function(c) { expHTML += renderCriterion(c); });
+    deducted.forEach(function(c) { expHTML += buildCriterionCard(c); });
   }
+  document.getElementById("lcr-explanations").innerHTML = expHTML;
 
-  expEl.innerHTML = expHTML;
-
-
-  // ④ Language tip
+  // ④ Language tip + ⑤ Optimal approach
   document.getElementById("lcr-lang-tip").innerHTML =
-    '<div class="lcr-body-text">' + data.languageTip + '</div>';
-
-  // ⑤ Optimal approach
+    '<div class="lcr-body-text">' + sanitize(data.languageTip || "") + '</div>';
   document.getElementById("lcr-optimal").innerHTML =
-    '<div class="lcr-body-text">' + data.optimalApproach + '</div>';
+    '<div class="lcr-body-text">' + sanitize(data.optimalApproach || "") + '</div>';
 }
 
 // ── 7. Chrome message helper ──────────────────

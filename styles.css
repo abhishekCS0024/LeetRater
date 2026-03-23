@@ -70,10 +70,8 @@
   top: 0;
   right: 0;
   height: 100vh;
-  /* Width is just the panel — tab is independently positioned */
+  /* Tab is a separate element — sidebar is panel width only */
   width: var(--lcr-width);
-  display: flex;
-  flex-direction: row;
   z-index: 99999;
   pointer-events: none;
   font-family: var(--lcr-font-ui);
@@ -82,28 +80,26 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* When collapsed, panel is hidden so container takes no space */
-#lcr-sidebar.lcr-collapsed {
-  width: 0;
-  pointer-events: none;
-}
-
+/* When collapsed: panel slides off, sidebar takes no pointer space */
 #lcr-sidebar.lcr-collapsed #lcr-panel {
   transform: translateX(100%);
   opacity: 0;
   pointer-events: none;
 }
-
-#lcr-sidebar.lcr-collapsed #lcr-tab {
-  opacity: 1;
-  pointer-events: all;
+#lcr-sidebar.lcr-collapsed {
+  pointer-events: none;
 }
 
 
 /* ══════════════════════════════════════════════
    TOGGLE TAB
 ══════════════════════════════════════════════ */
+/* Tab: fixed to viewport right edge, vertically centered */
 #lcr-tab {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   width: var(--lcr-tab-width);
   height: 72px;
   background: linear-gradient(135deg, var(--lcr-accent), var(--lcr-accent-dim));
@@ -113,42 +109,25 @@
   justify-content: center;
   cursor: pointer;
   pointer-events: all;
-  /* Fixed position on the right edge — never floats over page content */
-  position: fixed;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  transition: right var(--lcr-transition), box-shadow var(--lcr-transition),
-              background var(--lcr-transition);
+  z-index: 100000;
+  transition: right var(--lcr-transition), box-shadow var(--lcr-transition);
   box-shadow: -4px 0 20px rgba(255, 161, 22, 0.2);
   user-select: none;
-  z-index: 100000;
   overflow: hidden;
 }
 
-#lcr-tab::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 50%);
-  opacity: 0;
-  transition: opacity var(--lcr-transition);
-}
-
-/* When sidebar is open, JS adds lcr-open class to tab to shift it left */
+/* When open: tab shifts left by panel width */
 #lcr-tab.lcr-open {
   right: var(--lcr-width);
 }
 
 #lcr-tab:hover {
   box-shadow: -6px 0 28px rgba(255,161,22,0.35);
-  background: linear-gradient(135deg, var(--lcr-accent-dim), #aa6a00);
 }
-#lcr-tab:hover::before { opacity: 1; }
 
 #lcr-tab-icon {
-  font-size: 18px;
-  writing-mode: horizontal-tb;
+  font-size: 20px;
+  line-height: 1;
 }
 
 
@@ -782,3 +761,25 @@
   .lcr-score-value { font-size: 22px; }
   #lcr-analyze-btn { padding: 10px 0; margin: 12px 18px; }
 }
+/* ══ VALIDATION ERROR UI ══════════════════════ */
+.lcr-validation-header { display:flex; align-items:flex-start; gap:12px; padding:4px 0; }
+.lcr-validation-icon   { font-size:22px; flex-shrink:0; line-height:1.2; }
+.lcr-validation-label  { font-size:13px; font-weight:700; color:var(--lcr-red); margin-bottom:3px; }
+.lcr-validation-summary { font-size:12px; color:var(--lcr-text); line-height:1.6; }
+.lcr-validation-zero-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; }
+.lcr-validation-zero-label { font-size:12px; color:var(--lcr-text-muted); }
+.lcr-validation-zero-reason { font-size:11px; color:var(--lcr-red); background:var(--lcr-red-dim); border:1px solid rgba(239,71,67,0.2); padding:2px 8px; border-radius:4px; font-family:var(--lcr-font); }
+.lcr-score-invalid { background:var(--lcr-red-dim)!important; color:var(--lcr-red)!important; border-color:var(--lcr-red)!important; }
+.lcr-error-line-card { background:var(--lcr-surface-2); border:1px solid rgba(239,71,67,0.25); border-left:3px solid var(--lcr-red); border-radius:0 var(--lcr-radius-sm) var(--lcr-radius-sm) 0; padding:8px 10px; margin-bottom:6px; }
+.lcr-error-line-header { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+.lcr-error-line-num { font-size:10px; font-weight:700; font-family:var(--lcr-font); color:var(--lcr-red); background:var(--lcr-red-dim); padding:1px 6px; border-radius:3px; flex-shrink:0; }
+.lcr-error-line-issue { font-size:12px; color:var(--lcr-text); font-weight:500; }
+.lcr-error-line-code { font-size:11px; font-family:var(--lcr-font); color:var(--lcr-text-muted); background:var(--lcr-bg); border:1px solid var(--lcr-border); border-radius:4px; padding:4px 8px; margin-top:4px; white-space:pre-wrap; word-break:break-all; }
+.lcr-validation-suggestion { display:flex; flex-direction:column; gap:6px; }
+.lcr-suggestion-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:var(--lcr-green); }
+
+/* ══ CATEGORY BADGE ═══════════════════════════ */
+.lcr-category-badge { display:flex; align-items:center; gap:6px; padding:5px 10px; margin-bottom:8px; background:var(--lcr-accent-glow); border:1px solid rgba(255,161,22,0.25); border-radius:var(--lcr-radius-sm); }
+.lcr-category-icon  { font-size:13px; flex-shrink:0; }
+.lcr-category-name  { font-size:11px; font-weight:700; color:var(--lcr-accent); text-transform:uppercase; letter-spacing:0.6px; }
+.lcr-category-rationale { font-size:11px; color:var(--lcr-text-muted); line-height:1.5; margin-bottom:10px; padding:0 2px; font-style:italic; }
