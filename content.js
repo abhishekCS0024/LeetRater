@@ -15,7 +15,7 @@ function injectSidebar() {
 
   sidebar.innerHTML = `
     <!-- Toggle tab (always visible) -->
-    <div id="lcr-tab" title="LeetCode Code Rater">
+    <div id="lcr-tab" title="LeetCode Leet Rater">
       <span id="lcr-tab-icon">⚡</span>
     </div>
 
@@ -24,7 +24,7 @@ function injectSidebar() {
 
       <!-- Header -->
       <div id="lcr-header">
-        <span id="lcr-title">Code Rater</span>
+        <span id="lcr-title">Leet Rater</span>
         <button id="lcr-close" title="Collapse">✕</button>
       </div>
 

@@ -25,9 +25,7 @@
       border-bottom: 1px solid #3a3a3a;
     }
 
-    .header-icon {
-      font-size: 18px;
-    }
+    .header-icon { font-size: 18px; }
 
     .header-title {
       font-size: 14px;
@@ -42,9 +40,7 @@
       margin-top: 1px;
     }
 
-    .section {
-      margin-bottom: 18px;
-    }
+    .section { margin-bottom: 18px; }
 
     label {
       display: block;
@@ -70,18 +66,10 @@
       transition: border-color 0.2s;
     }
 
-    input:focus {
-      border-color: #ffa116;
-    }
+    input:focus { border-color: #ffa116; }
 
-    .input-row {
-      display: flex;
-      gap: 8px;
-    }
-
-    .input-row input {
-      flex: 1;
-    }
+    .input-row { display: flex; gap: 8px; }
+    .input-row input { flex: 1; }
 
     .btn {
       padding: 9px 14px;
@@ -90,36 +78,24 @@
       font-size: 12px;
       font-weight: 700;
       cursor: pointer;
-      transition: background 0.2s, opacity 0.2s;
+      transition: background 0.2s;
       white-space: nowrap;
     }
 
-    .btn-primary {
-      background: #ffa116;
-      color: #1a1a1a;
-    }
-
+    .btn-primary { background: #ffa116; color: #1a1a1a; }
     .btn-primary:hover { background: #cc8010; }
 
-    .btn-ghost {
-      background: #333;
-      color: #eff1f6;
-    }
-
+    .btn-ghost { background: #333; color: #eff1f6; }
     .btn-ghost:hover { background: #3a3a3a; }
 
     .hint {
       font-size: 11px;
       color: #8a8a8a;
       margin-top: 6px;
-      line-height: 1.5;
+      line-height: 1.6;
     }
 
-    .hint a {
-      color: #ffa116;
-      text-decoration: none;
-    }
-
+    .hint a { color: #ffa116; text-decoration: none; }
     .hint a:hover { text-decoration: underline; }
 
     .status {
@@ -148,78 +124,73 @@
       margin: 18px 0;
     }
 
-    .pilot-badge {
-      display: inline-block;
-      background: rgba(255, 161, 22, 0.15);
-      color: #ffa116;
-      border: 1px solid rgba(255, 161, 22, 0.3);
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      padding: 2px 7px;
-      border-radius: 4px;
-      text-transform: uppercase;
-      margin-left: 6px;
-      vertical-align: middle;
-    }
-
-    .mode-row {
+    /* Key status indicator */
+    .key-status {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
       background: #282828;
       border: 1px solid #3a3a3a;
       border-radius: 6px;
-      padding: 10px 12px;
+      margin-bottom: 14px;
     }
 
-    .mode-label {
-      font-size: 12px;
-      color: #eff1f6;
+    .key-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: background 0.3s;
     }
 
-    .mode-sub {
+    .key-dot.saved   { background: #00b8a3; box-shadow: 0 0 6px rgba(0,184,163,0.4); }
+    .key-dot.missing { background: #ef4743; }
+
+    .key-status-text { font-size: 12px; color: #eff1f6; }
+    .key-status-sub  { font-size: 11px; color: #8a8a8a; margin-top: 1px; }
+
+    /* Steps */
+    .step {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      margin-bottom: 7px;
+    }
+
+    .step-num {
+      width: 17px;
+      height: 17px;
+      border-radius: 50%;
+      background: rgba(255, 161, 22, 0.15);
+      color: #ffa116;
+      font-size: 10px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .step-text {
       font-size: 11px;
       color: #8a8a8a;
-      margin-top: 2px;
+      line-height: 1.55;
     }
 
-    /* Toggle switch */
-    .toggle {
-      position: relative;
-      width: 36px;
-      height: 20px;
-      flex-shrink: 0;
+    .step-text a { color: #ffa116; text-decoration: none; }
+    .step-text a:hover { text-decoration: underline; }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      padding: 3px 0;
     }
 
-    .toggle input { opacity: 0; width: 0; height: 0; }
-
-    .toggle-slider {
-      position: absolute;
-      inset: 0;
-      background: #3a3a3a;
-      border-radius: 20px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .toggle-slider::before {
-      content: '';
-      position: absolute;
-      width: 14px;
-      height: 14px;
-      left: 3px;
-      top: 3px;
-      background: #8a8a8a;
-      border-radius: 50%;
-      transition: transform 0.2s, background 0.2s;
-    }
-
-    .toggle input:checked + .toggle-slider { background: rgba(255,161,22,0.3); }
-    .toggle input:checked + .toggle-slider::before {
-      transform: translateX(16px);
-      background: #ffa116;
-    }
+    .info-label { color: #555; }
+    .info-value { color: #8a8a8a; }
 
     .footer {
       margin-top: 4px;
@@ -231,51 +202,68 @@
 </head>
 <body>
 
+  <!-- Header -->
   <div class="header">
-    <span class="header-icon">⚡</span>
+    <span class="header-icon">&#9889;</span>
     <div>
       <div class="header-title">Leet Rater</div>
-      <div class="header-sub">Settings</div>
+      <div class="header-sub">Settings &amp; API Key</div>
     </div>
   </div>
 
-  <!-- Mode toggle -->
-  <div class="section">
-    <label>Mode <span class="pilot-badge">Pilot</span></label>
-    <div class="mode-row">
-      <div>
-        <div class="mode-label">Pilot mode</div>
-        <div class="mode-sub">Uses mock data — no API key needed</div>
-      </div>
-      <label class="toggle">
-        <input type="checkbox" id="pilot-toggle" />
-        <span class="toggle-slider"></span>
-      </label>
+  <!-- Key status indicator -->
+  <div class="key-status">
+    <div class="key-dot missing" id="key-dot"></div>
+    <div>
+      <div class="key-status-text" id="key-status-text">No API key saved</div>
+      <div class="key-status-sub"  id="key-status-sub">Required to analyze code</div>
     </div>
   </div>
 
-  <div class="divider"></div>
-
-  <!-- Groq API key -->
+  <!-- API Key input -->
   <div class="section">
     <label>Groq API Key</label>
     <div class="input-row">
       <input type="password" id="api-key-input" placeholder="gsk_••••••••••••••••••••••" />
       <button class="btn btn-ghost" id="toggle-visibility">Show</button>
     </div>
-    <p class="hint">
-      Get your free key at
-      <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a>
-      — no credit card required.
-    </p>
     <div class="status" id="status-msg"></div>
   </div>
 
-  <button class="btn btn-primary" id="save-btn" style="width:100%">Save settings</button>
+  <button class="btn btn-primary" id="save-btn" style="width:100%">Save API Key</button>
 
   <div class="divider"></div>
 
-  <div class="footer">v1.0 · Pilot build</div>
+  <!-- How to get started -->
+  <div class="section">
+    <label>How to get started</label>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-text">
+        Visit <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a>
+        — free, no credit card needed
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-text">Create a new API key and paste it above, then click Save</div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-text">Open any LeetCode problem, write your solution, and click Analyze</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Info -->
+  <div style="margin-bottom: 16px;">
+    <div class="info-row"><span class="info-label">Model</span><span class="info-value">llama-3.3-70b-versatile</span></div>
+    <div class="info-row"><span class="info-label">Provider</span><span class="info-value">Groq (free tier available)</span></div>
+    <div class="info-row"><span class="info-label">Your code</span><span class="info-value">Sent to Groq API only</span></div>
+  </div>
+
+  <div class="footer">Leet Rater v1.0</div>
 
   <script src="settings.js"></script>
 </body>
