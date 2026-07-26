@@ -29,6 +29,13 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     return true; // keep port open for async response
   }
 
+  if (request.action === 'translateCode') {
+    handleTranslateCode(request)
+      .then(data => sendResponse({ ok: true,  data }))
+      .catch(err => sendResponse({ ok: false, error: err.message }));
+    return true; // keep port open for async response
+  }
+
   if (request.action === 'settingsUpdated') {
     console.info('[LeetRater] Settings updated.');
   }
@@ -219,6 +226,47 @@ async function rateCode({ apiKey, code, language, title, description }) {
 
   const raw = await callGroq({ apiKey, system: RATING_SYSTEM, user: userMsg, maxTokens: MAX_TOKENS, temperature: TEMP_RATE });
   return parseAndValidateRating(raw);
+}
+
+// ─── Translation ──────────────────────────────────────────────────────────────
+
+const TRANSLATE_SYSTEM = `
+You are a precise code translator. Translate the given solution from one language to another, preserving the EXACT structure — not an idiomatic rewrite.
+
+RULES:
+• Keep the same variable names (rename only if a reserved word in the target language)
+• Keep the same loop/branch structure — do NOT replace hand-written loops with library algorithms, comprehensions, or streams
+• Keep the same function/method decomposition
+• If the target language lacks a construct the source uses (e.g. classes/exceptions/templates/STL when targeting C), adapt it minimally and explain the adaptation in "notes" — do NOT silently rewrite idiomatically
+  - Targeting C: classes → structs + free functions; exceptions → error codes or sentinel return values
+  - Targeting Java: free functions → static methods wrapped in a class
+• Do not add explanatory comments inside the code itself — put explanations only in "notes"
+
+Respond ONLY with valid JSON, no markdown:
+{
+  "translatedCode": "<full translated source, escaped as a JSON string>",
+  "language": "<target language name>",
+  "notes": ["<short note on any structural adaptation>", ...]
+}
+`.trim();
+
+async function handleTranslateCode({ code, sourceLanguage, targetLanguage, title }) {
+  const apiKey = await getApiKey();
+  const userMsg = `Problem: ${title}\n\nSource language: ${sourceLanguage}\nTarget language: ${targetLanguage}\n\nSolution:\n\`\`\`${sourceLanguage}\n${code}\n\`\`\`\n\nTranslate to ${targetLanguage}. JSON only.`;
+
+  const raw = await callGroq({ apiKey, system: TRANSLATE_SYSTEM, user: userMsg, maxTokens: 3000, temperature: 0.1 });
+  return parseAndValidateTranslation(raw);
+}
+
+function parseAndValidateTranslation(raw) {
+  const parsed = parseJSON(raw);
+
+  if (typeof parsed.translatedCode !== 'string' || !parsed.translatedCode.trim())
+    throw new Error("Response missing 'translatedCode' field.");
+  if (typeof parsed.language !== 'string') parsed.language = '';
+  if (!Array.isArray(parsed.notes)) parsed.notes = [];
+
+  return parsed;
 }
 
 // ─── Groq HTTP Call ───────────────────────────────────────────────────────────

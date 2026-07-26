@@ -36,6 +36,8 @@ const LANG_SELECTORS = [
 
 const KNOWN_LANGS = ['C++','Python3','Python','Java','JavaScript','TypeScript','C','C#','Go','Rust','Swift','Kotlin','Ruby','Scala'];
 
+const TRANSLATE_TARGETS = ['C', 'C++', 'Java', 'Python'];
+
 const TITLE_SELECTORS = [
   "[data-cy='question-title']",
   '.mr-2.text-lg.font-medium',
@@ -82,6 +84,10 @@ const DESC_SELECTORS = [
 function isEditorReady() {
   return !!document.querySelector(EDITOR_SELECTORS);
 }
+
+// ─── Translation State ────────────────────────────────────────────────────────
+
+let translationCache = {}; // keyed by targetLanguage
 
 // ─── UI Injection ─────────────────────────────────────────────────────────────
 
@@ -141,11 +147,24 @@ function injectUI() {
 
       <div id="lr-error" class="lr-hidden lr-error-box" role="alert"></div>
 
+      <div class="lr-card" id="lr-translate-card">
+        <div class="lr-section-title">Translate Solution</div>
+        <div id="lr-lang-buttons"></div>
+        <div id="lr-translate-loading" class="lr-hidden">Translating&#8230;</div>
+        <div id="lr-translate-output" class="lr-hidden">
+          <pre><code id="lr-translate-code"></code></pre>
+          <button id="lr-translate-copy" type="button">Copy</button>
+          <div id="lr-translate-notes"></div>
+        </div>
+        <div id="lr-translate-error" class="lr-hidden lr-error-box" role="alert"></div>
+      </div>
+
     </div>
   `;
   document.body.appendChild(sidebar);
 
   attachListeners(tab, sidebar);
+  renderLangButtons();
 }
 
 // ─── Event Listeners ──────────────────────────────────────────────────────────
@@ -205,6 +224,91 @@ async function handleAnalyze() {
   } finally {
     btn.disabled    = false;
     btnText.textContent = 'Analyze again';
+  }
+}
+
+// ─── Translation ──────────────────────────────────────────────────────────────
+
+function renderLangButtons() {
+  const { language: sourceLanguage } = (() => {
+    try { return scrapeCode(); } catch { return { language: 'unknown' }; }
+  })();
+
+  const container = document.getElementById('lr-lang-buttons');
+  container.innerHTML = TRANSLATE_TARGETS
+    .filter(lang => lang.toLowerCase() !== String(sourceLanguage).toLowerCase())
+    .map(lang => `<button class="lr-lang-btn" type="button" data-lang="${sanitize(lang)}">${sanitize(lang)}</button>`)
+    .join('');
+
+  container.querySelectorAll('.lr-lang-btn').forEach(btn => {
+    btn.addEventListener('click', () => handleTranslateClick(btn.dataset.lang, btn));
+  });
+
+  document.getElementById('lr-translate-copy').addEventListener('click', handleCopyClick);
+}
+
+async function handleTranslateClick(targetLanguage, btnEl) {
+  const loading  = document.getElementById('lr-translate-loading');
+  const output   = document.getElementById('lr-translate-output');
+  const errorBox = document.getElementById('lr-translate-error');
+
+  document.querySelectorAll('.lr-lang-btn').forEach(b => b.classList.remove('active'));
+  btnEl.classList.add('active');
+
+  errorBox.classList.add('lr-hidden');
+
+  if (translationCache[targetLanguage]) {
+    renderTranslation(translationCache[targetLanguage]);
+    return;
+  }
+
+  output.classList.add('lr-hidden');
+  loading.classList.remove('lr-hidden');
+
+  try {
+    const { code, language: sourceLanguage } = scrapeCode();
+    const { title } = scrapeProblem();
+
+    if (!code || code.trim().length < 5) {
+      throw new Error('No code found. Please write your solution first.');
+    }
+
+    const response = await sendMessage({ action: 'translateCode', code, sourceLanguage, targetLanguage, title });
+    if (!response.ok) throw new Error(response.error || 'Unknown error from background.');
+
+    translationCache[targetLanguage] = response.data;
+    renderTranslation(response.data);
+
+  } catch (err) {
+    errorBox.textContent = '⚠ ' + err.message;
+    errorBox.classList.remove('lr-hidden');
+    console.error('[LeetRater] Translation failed:', err);
+  } finally {
+    loading.classList.add('lr-hidden');
+  }
+}
+
+function renderTranslation(data) {
+  document.getElementById('lr-translate-code').innerHTML = sanitize(data.translatedCode);
+
+  const notes = Array.isArray(data.notes) ? data.notes : [];
+  document.getElementById('lr-translate-notes').innerHTML = notes.length
+    ? '<div class="lr-section-label">Notes</div>' + notes.map(n => `<div class="lr-body-text">${sanitize(n)}</div>`).join('')
+    : '';
+
+  document.getElementById('lr-translate-output').classList.remove('lr-hidden');
+}
+
+async function handleCopyClick() {
+  const btn  = document.getElementById('lr-translate-copy');
+  const code = document.getElementById('lr-translate-code').textContent;
+  try {
+    await navigator.clipboard.writeText(code);
+    const original = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  } catch (err) {
+    console.error('[LeetRater] Copy failed:', err);
   }
 }
 
